@@ -1,0 +1,32 @@
+{
+	"name": "LandlingFile",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "StorageAccount",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"P_fileName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().P_fileName",
+					"type": "Expression"
+				},
+				"fileSystem": "landing"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

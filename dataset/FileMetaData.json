@@ -1,0 +1,32 @@
+{
+	"name": "FileMetaData",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "StorageAccount",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"P_FileName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().P_FileName",
+					"type": "Expression"
+				},
+				"fileSystem": "landing"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

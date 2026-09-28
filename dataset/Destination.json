@@ -1,0 +1,39 @@
+{
+	"name": "Destination",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "StorageAccount",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"P_file_Name": {
+				"type": "string"
+			},
+			"P_file_date": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().P_file_Name",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().P_file_date",
+					"type": "Expression"
+				},
+				"fileSystem": "raw"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

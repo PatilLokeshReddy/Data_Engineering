@@ -1,0 +1,15 @@
+{
+	"name": "onlineretailadf",
+	"properties": {
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "3b5d7ca5-bffa-4ec0-8501-0c443d78779c",
+		"tenantId": "2959f05b-3499-4584-9c26-ea3d32f0731f"
+	}
+}

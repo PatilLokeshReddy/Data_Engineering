@@ -1,0 +1,528 @@
+{
+	"name": "Ingestrawdata",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetLandingMetaData",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "If Condition1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "GetLandlingMetadata",
+						"type": "DatasetReference"
+					},
+					"fieldList": [
+						"childItems",
+						"itemName",
+						"itemType",
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "WaterMarkFileExist",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "watermarkfile",
+						"type": "DatasetReference"
+					},
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "JsonReadSettings"
+					}
+				}
+			},
+			{
+				"name": "If Condition1",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "WaterMarkFileExist",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@activity('WaterMarkFileExist').output.exists",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "SetWaterMark_False",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "watermarkvalue",
+								"value": {
+									"value": "@string('1900-01-01T00:00:00Z')",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "LatestFileValidate",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "JsonSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "JsonReadSettings"
+									}
+								},
+								"dataset": {
+									"referenceName": "watermark",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "SetWaterMark_True",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "LatestFileValidate",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "watermarkvalue",
+								"value": {
+									"value": "@activity('LatestFileValidate').output.firstRow.lastProcessed",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "InitMaxLastModified",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "GetLandingMetaData",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "maxFileLastModified",
+					"value": {
+						"value": "@string('1900-01-01T00:00:00Z')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "LoopFiles",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "InitMaxLastModified",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetLandingMetaData').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "GetMetadataOfFile",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "FileMetaData",
+									"type": "DatasetReference",
+									"parameters": {
+										"P_FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"lastModified"
+								],
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "CheckIfMax",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "GetMetadataOfFile",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(activity('GetMetadataOfFile').output.lastModified, variables('maxFileLastModified'))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "UpdateMaxLastModified",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "maxFileLastModified",
+											"value": {
+												"value": "@activity('GetMetadataOfFile').output.lastModified",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "LatestProcessedRecord",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "CheckIfMax",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(activity('GetMetadataOfFile').output.lastModified,variables('watermarkvalue'))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "LoadtoRaw",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "DelimitedTextSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "DelimitedTextWriteSettings",
+													"quoteAllText": true,
+													"fileExtension": ".csv"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "LandlingFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"P_fileName": {
+														"value": "@item().name",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "Destination",
+												"type": "DatasetReference",
+												"parameters": {
+													"P_file_Name": {
+														"value": "@item().name",
+														"type": "Expression"
+													},
+													"P_file_date": {
+														"value": "@formatDateTime(\n    activity('GetMetadataOfFile').output.lastModified,\n    'yyyy-MM-dd'\n)",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "LatestFileName",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "LoadtoRaw",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "LatestFileName",
+											"value": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "WatermarkUpdate",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "LatestWaterMark",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "PUT",
+					"headers": {
+						"x-ms-version": "2021-12-02",
+						"x-ms-blob-type": "BlockBlob",
+						"Content-Type": "application/json"
+					},
+					"url": "https://onlineretailproject.blob.core.windows.net/control/watermark.json",
+					"body": {
+						"value": "@concat(\n  '{',\n  '\"lastProcessed\":\"',\n  variables('latestwatermarkValue'),\n  '\"',\n  '}'\n)",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://storage.azure.com/"
+					}
+				}
+			},
+			{
+				"name": "LatestWaterMark",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LoopFiles",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "latestwatermarkValue",
+					"value": {
+						"value": "@variables('maxFileLastModified')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "CalldatabricksJob",
+				"type": "DatabricksJob",
+				"dependsOn": [
+					{
+						"activity": "WatermarkUpdate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"jobId": "478852941367598",
+					"jobParameters": {
+						"adf_loaded_date": {
+							"value": "@formatDateTime(variables('latestwatermarkValue'),'yyyy-MM-dd')",
+							"type": "Expression"
+						},
+						"adf_loaded_file": {
+							"value": "@variables('LatestFileName')",
+							"type": "Expression"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureDatabricks1",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"variables": {
+			"watermarkvalue": {
+				"type": "String"
+			},
+			"latestwatermarkValue": {
+				"type": "String"
+			},
+			"maxFileLastModified": {
+				"type": "String"
+			},
+			"LatestFileName": {
+				"type": "String"
+			},
+			"CurrentExecutedTime": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-09-25T17:34:14Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

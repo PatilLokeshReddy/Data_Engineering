@@ -1,5 +1,5 @@
 {
-	"name": "Ingestrawdata",
+	"name": "online-retail-pipeline",
 	"properties": {
 		"activities": [
 			{

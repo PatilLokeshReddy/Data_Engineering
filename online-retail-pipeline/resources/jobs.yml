@@ -1,0 +1,40 @@
+resources:
+  jobs:
+    ADFJOB:
+      name: ADFJOB
+      tasks:
+        - task_key: RawtoBronze
+          notebook_task:
+            notebook_path: /Workspace/Users/patillokesh813@gmail.com/Transformation/Bronze_Transformation
+            base_parameters:
+              loaded_date: "{{job.parameters.adf_loaded_date}}"
+              loaded_file: "{{job.parameters.adf_loaded_file}}"
+            source: WORKSPACE
+        - task_key: BronzeToSilver
+          depends_on:
+            - task_key: RawtoBronze
+          notebook_task:
+            notebook_path: /Workspace/Users/patillokesh813@gmail.com/Transformation/Silver_Transformation
+            source: WORKSPACE
+        - task_key: Gold_Dimension
+          depends_on:
+            - task_key: BronzeToSilver
+          notebook_task:
+            notebook_path: /Workspace/Users/patillokesh813@gmail.com/Transformation/Gold_Dimension
+              Transformation
+            source: WORKSPACE
+        - task_key: Gold_Fact
+          depends_on:
+            - task_key: Gold_Dimension
+          notebook_task:
+            notebook_path: /Workspace/Users/patillokesh813@gmail.com/Transformation/Gold_Fact
+              Transformation
+            source: WORKSPACE
+      queue:
+        enabled: true
+      parameters:
+        - name: adf_loaded_date
+          default: ""
+        - name: adf_loaded_file
+          default: ""
+      performance_target: PERFORMANCE_OPTIMIZED

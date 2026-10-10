@@ -1,0 +1,15 @@
+{
+	"name": "voltgridadf",
+	"properties": {
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "5d841dd9-01fe-4e43-accf-86123624f9bf",
+		"tenantId": "2959f05b-3499-4584-9c26-ea3d32f0731f"
+	}
+}

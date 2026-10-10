@@ -1,0 +1,35 @@
+{
+	"name": "RawContainer",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "VoltGrid_StorageAccount",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"entity": {
+				"type": "string"
+			},
+			"file_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().file_name",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().entity",
+					"type": "Expression"
+				},
+				"fileSystem": "raw"
+			}
+		},
+		"schema": {}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

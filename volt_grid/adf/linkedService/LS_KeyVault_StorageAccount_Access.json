@@ -1,0 +1,20 @@
+{
+	"name": "LS_KeyVault_StorageAccount_Access",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://voltgridstorageaccount.dfs.core.windows.net/",
+			"accountKey": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "VoltGridStorageAccountKey",
+				"secretVersion": "1924024b755241299e96359da31bb673"
+			}
+		}
+	}
+}

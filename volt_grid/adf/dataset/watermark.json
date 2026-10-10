@@ -1,0 +1,29 @@
+{
+	"name": "watermark",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_KeyVault_StorageAccount_Access",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"wm_file_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().wm_file_name",
+					"type": "Expression"
+				},
+				"folderPath": "watermark",
+				"fileSystem": "controls"
+			}
+		},
+		"schema": {}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

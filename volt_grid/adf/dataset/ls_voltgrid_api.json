@@ -1,0 +1,27 @@
+{
+	"name": "ls_voltgrid_api",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "rest_voltgrid_api",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"p_page": {
+				"type": "string"
+			},
+			"entity_name": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": {
+				"value": "/api/db/@{dataset().entity_name}/?page=@{dataset().p_page}",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

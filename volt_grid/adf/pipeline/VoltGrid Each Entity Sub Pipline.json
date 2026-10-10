@@ -1,0 +1,579 @@
+{
+	"name": "VoltGrid Each Entity Sub Pipline",
+	"properties": {
+		"activities": [
+			{
+				"name": "act_run_start",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "run_start",
+					"value": {
+						"value": "@utcNow('yyyy-MM-ddTHH:mm:ss')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "act_watermark_file",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "act_run_start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "watermark_file",
+					"value": {
+						"value": "@concat('watermark','_',pipeline().parameters.entity_name,'.json')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "act_get_entity_watermark",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "act_watermark_file",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "watermark",
+						"type": "DatasetReference",
+						"parameters": {
+							"wm_file_name": {
+								"value": "@variables('watermark_file')",
+								"type": "Expression"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "act_for_each_entity",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "act_start_page",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@or(equals(variables('done'),true),greaterOrEquals(int(variables('page')),add(int(variables('start_page')),int(pipeline().parameters.maxPages))))",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "act_file_name_update",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "act_get_last_batch",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "fileName",
+								"value": {
+									"value": "@concat(pipeline().parameters.entity_name,'_batch_',variables('page'),'.json')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "act_sink_entitys_data",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "act_file_name_update",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "RestSource",
+									"additionalColumns": [
+										{
+											"name": "ingestion_time",
+											"value": {
+												"value": "@formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ssZ')",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "batch_no",
+											"value": {
+												"value": "@variables('page')",
+												"type": "Expression"
+											}
+										}
+									],
+									"httpRequestTimeout": "00:01:40",
+									"requestInterval": "00.00:00:00.010",
+									"requestMethod": "GET",
+									"additionalHeaders": {
+										"Authorization": {
+											"value": "@concat('Token ',pipeline().parameters.token)",
+											"type": "Expression"
+										}
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings",
+										"copyBehavior": "FlattenHierarchy"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "ls_voltgrid_api",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_page": {
+											"value": "@variables('page')",
+											"type": "Expression"
+										},
+										"entity_name": {
+											"value": "@pipeline().parameters.entity_name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "RawContainer",
+									"type": "DatasetReference",
+									"parameters": {
+										"entity": {
+											"value": "@concat(pipeline().parameters.entity_name,'/ingestion_date=',pipeline().parameters.ingestion_date)",
+											"type": "Expression"
+										},
+										"file_name": {
+											"value": "@variables('fileName')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "act_after_copy",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "act_sink_entitys_data",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(activity('act_sink_entitys_data').Status,'Succeeded')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "act_store_error",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "errorMessage",
+											"value": {
+												"value": "@activity('act_sink_entitys_data').error.message",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "act_set_done_on_error",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "act_store_error",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "done",
+											"value": {
+												"value": "@bool(1)",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "act_is_record_processed",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "done",
+											"value": {
+												"value": "@equals(activity('act_sink_entitys_data').output.rowsCopied,0)",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "act_incremental_itteration",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "act_is_record_processed",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "nextPage",
+											"value": {
+												"value": "@string(add(int(variables('page')),1))",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "act_next_itteration",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "act_incremental_itteration",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "page",
+											"value": {
+												"value": "@variables('nextPage')",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "act_get_last_batch",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "page",
+								"value": {
+									"value": "@if(empty(variables('nextPage')),if(contains(activity('act_get_entity_watermark').output.firstRow,'lastBatch'),string(add(int(activity('act_get_entity_watermark').output.firstRow.lastBatch),1)),'1'),variables('nextPage'))",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"timeout": "0.01:00:00"
+				}
+			},
+			{
+				"name": "act_check_load_result",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "act_for_each_entity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@and(not(empty(variables('errorMessage'))),not(contains(variables('errorMessage'),'Invalid page')))",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "act_fail_load",
+							"type": "Fail",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@if(empty(variables('errorMessage')),concat('Page cap reached for ',pipeline().parameters.entity_name),variables('errorMessage'))",
+									"type": "Expression"
+								},
+								"errorCode": "LOAD_FAILED"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "act_update_watermark",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "act_check_load_result",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "PUT",
+					"headers": {
+						"Content-Type": "application/json",
+						"x-ms-blob-type": "BlockBlob",
+						"x-ms-version": "2021-08-06"
+					},
+					"url": {
+						"value": "@concat('https://voltgridstorageaccount.blob.core.windows.net/controls/watermark/',variables('watermark_file'))",
+						"type": "Expression"
+					},
+					"body": {
+						"value": "@concat('{\"lastProcessed\":\"', variables('run_start'), '\", \"lastBatch\":\"', variables('page'), '\"}')",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://storage.azure.com/"
+					}
+				}
+			},
+			{
+				"name": "act_web_total_pages",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "act_get_entity_watermark",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"headers": {
+						"Authorization": {
+							"value": "@concat('Token ',pipeline().parameters.token)",
+							"type": "Expression"
+						}
+					},
+					"url": {
+						"value": "@concat('https://ev-project-navy-mu.vercel.app/api/db/', pipeline().parameters.entity_name, '/?page=1')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "act_set_total_pages",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "act_web_total_pages",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "total_pages",
+					"value": {
+						"value": "@string(activity('act_web_total_pages').output.pagination.total_pages)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "act_start_page",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "act_set_total_pages",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "start_page",
+					"value": {
+						"value": "@string(activity('act_get_entity_watermark').output.firstRow.lastBatch)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"entity_name": {
+				"type": "string"
+			},
+			"token": {
+				"type": "securestring"
+			},
+			"ingestion_date": {
+				"type": "string"
+			},
+			"maxPages": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"done": {
+				"type": "Boolean",
+				"defaultValue": false
+			},
+			"page": {
+				"type": "String",
+				"defaultValue": "1"
+			},
+			"nextPage": {
+				"type": "String"
+			},
+			"fileName": {
+				"type": "String"
+			},
+			"watermark_file": {
+				"type": "String"
+			},
+			"run_start": {
+				"type": "String"
+			},
+			"errorMessage": {
+				"type": "String"
+			},
+			"total_pages": {
+				"type": "String"
+			},
+			"start_page": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-10-10T05:44:33Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

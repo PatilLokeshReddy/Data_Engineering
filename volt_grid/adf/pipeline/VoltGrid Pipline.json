@@ -1,0 +1,281 @@
+{
+	"name": "VoltGrid Pipline",
+	"properties": {
+		"activities": [
+			{
+				"name": "act_get_user_name",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://voltgridkeyvault.vault.azure.net/secrets/userName/?api-version=7.0",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "act_get_password",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "act_get_user_name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://voltgridkeyvault.vault.azure.net/secrets/password/?api-version=7.0",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "act_get_token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "act_get_password",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"url": "https://ev-project-navy-mu.vercel.app/api/auth/login/",
+					"body": {
+						"value": "@concat('{\"username\":\"',activity('act_get_user_name').output.value,'\",\"password\":\"', activity('act_get_password').output.value, '\"}')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "act_store_token",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "act_get_token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "authToken",
+					"value": {
+						"value": "@activity('act_get_token').output.token",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "act_for_each_entity",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "act_store_token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@createArray(pipeline().parameters.customers,pipeline().parameters.payments,pipeline().parameters.sessions,pipeline().parameters.stations,pipeline().parameters.vehicles)",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "act_execute_sub_pipline",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": true
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "VoltGrid Each Entity Sub Pipline",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"entity_name": {
+										"value": "@item()",
+										"type": "Expression"
+									},
+									"token": {
+										"value": "@variables('authToken')",
+										"type": "Expression"
+									},
+									"ingestion_date": {
+										"value": "@formatDateTime(convertTimeZone(pipeline().TriggerTime,'UTC',\n        'India Standard Time'),'yyyy-MM-dd HH:mm')",
+										"type": "Expression"
+									},
+									"maxPages": {
+										"value": "@pipeline().parameters.maxPages",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "act_fail_user_name",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "act_get_user_name",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Key Vault userName lookup failed: ',activity('act_get_user_name').error.message)",
+						"type": "Expression"
+					},
+					"errorCode": "KV_USERNAME_FAILED"
+				}
+			},
+			{
+				"name": "act_fail_password",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "act_get_password",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Key Vault password lookup failed: ',activity('act_get_password').error.message)",
+						"type": "Expression"
+					},
+					"errorCode": "KV_PASSWORD_FAILED"
+				}
+			},
+			{
+				"name": "act_fail_token",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "act_get_token",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('API login failed: ',activity('act_get_token').error.message)",
+						"type": "Expression"
+					},
+					"errorCode": "LOGIN_FAILED"
+				}
+			},
+			{
+				"name": "act_fail_store_token",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "act_store_token",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Storing token failed: ',activity('act_store_token').error.message)",
+						"type": "Expression"
+					},
+					"errorCode": "STORE_TOKEN_FAILED"
+				}
+			}
+		],
+		"parameters": {
+			"payments": {
+				"type": "string",
+				"defaultValue": "payments"
+			},
+			"customers": {
+				"type": "string",
+				"defaultValue": "customers"
+			},
+			"vehicles": {
+				"type": "string",
+				"defaultValue": "vehicles"
+			},
+			"stations": {
+				"type": "string",
+				"defaultValue": "stations"
+			},
+			"sessions": {
+				"type": "string",
+				"defaultValue": "sessions"
+			},
+			"maxPages": {
+				"type": "string",
+				"defaultValue": "5"
+			}
+		},
+		"variables": {
+			"authToken": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-10-09T10:05:13Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

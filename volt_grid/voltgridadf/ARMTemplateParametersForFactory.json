@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "voltgridadf"
+		},
+		"VoltGrid_StorageAccount_accountKey": {
+			"value": ""
+		},
+		"LS_KeyVault_properties_typeProperties_baseUrl": {
+			"value": "https://voltGridKeyVault.vault.azure.net/"
+		},
+		"LS_KeyVault_StorageAccount_Access_properties_typeProperties_url": {
+			"value": "https://voltgridstorageaccount.dfs.core.windows.net/"
+		},
+		"VoltGrid_StorageAccount_properties_typeProperties_url": {
+			"value": "https://voltgridstorageaccount.dfs.core.windows.net/"
+		},
+		"rest_voltgrid_api_properties_typeProperties_url": {
+			"value": "https://ev-project-navy-mu.vercel.app"
+		}
+	}
+}
